@@ -38,13 +38,13 @@ RUN_LOG_FILE = LOG_DIR / "run.log"
 # Config
 # -----------------------------
 
-START_DATE = "2010-01-01"
+START_DATE = "2018-01-01"
 END_DATE = pd.Timestamp.today().strftime("%Y-%m-%d")
 
 HL = "en-US"
 TZ = 360
 GEO = "US"
-CHUNK_DAYS = 90  # bigger chunks = fewer requests (weekly data anyway)
+CHUNK_DAYS = 365  # yearly chunks (weekly resolution anyway)  # bigger chunks = fewer requests (weekly data anyway)
 
 SKIP_EXISTING = True
 REQUEST_SLEEP_RANGE = (1, 3)  # aggressive but usually safe
@@ -139,6 +139,21 @@ def load_stocklist() -> pd.DataFrame:
 # Pytrends
 # -----------------------------
 
+# Global rate limiter (shared across threads)
+from threading import Lock
+_last_request_ts = 0.0
+_rate_lock = Lock()
+MIN_INTERVAL = 1.2  # seconds between requests globally (tune 1.0–2.0)
+
+def throttle():
+    global _last_request_ts
+    with _rate_lock:
+        now = time.time()
+        wait = MIN_INTERVAL - (now - _last_request_ts)
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_ts = time.time()
+
 def build_pytrends():
     return TrendReq(hl=HL, tz=TZ)
 
@@ -167,17 +182,24 @@ def query_with_retries(pytrends, search_name, ticker, start_dt, end_dt):
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             logger.info(f"Query {ticker} {start_dt.date()} -> {end_dt.date()} (attempt {attempt})")
+            # jitter + global throttle to avoid synchronized bursts
+            time.sleep(random.uniform(0.2, 0.8))
+            throttle()
             df = query_chunk(pytrends, search_name, ticker, start_dt, end_dt)
             time.sleep(random.uniform(*REQUEST_SLEEP_RANGE))
             return df
 
         except Exception as e:
-            wait = BACKOFF_BASE_SECONDS * attempt
+            msg = str(e)
+            is_429 = "429" in msg
+            wait = (BACKOFF_BASE_SECONDS * attempt) * (2 if is_429 else 1)
             logger.warning(f"Retry {ticker} after error: {e} (sleep {wait}s)")
             time.sleep(wait)
             pytrends = build_pytrends()
 
-    raise RuntimeError(f"Failed {ticker} {start_dt} -> {end_dt}")
+    # Do not kill the whole ticker on one bad chunk; return empty and continue
+    logger.error(f"Giving up chunk for {ticker} {start_dt} -> {end_dt}")
+    return pd.DataFrame()
 
 
 # -----------------------------
@@ -204,6 +226,8 @@ def download_one(row):
         df = query_with_retries(pytrends, search_name, ticker, s, e)
         if not df.empty:
             parts.append(df)
+        else:
+            logger.warning(f"Empty/failed chunk {ticker} {s.date()}->{e.date()}")
 
     if not parts:
         return False, "empty", 0
@@ -221,6 +245,34 @@ def download_one(row):
 # Run
 # -----------------------------
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+MAX_WORKERS = 1  # single worker to avoid rate limiting  # reduced to lower 429 risk (tune 2–4)  # tune 3–6 depending on throttling
+
+
+def process_row(row):
+    ticker = row["ticker"]
+    start = pd.Timestamp.utcnow()
+
+    try:
+        ok, status, n = download_one(row)
+        end = pd.Timestamp.utcnow()
+
+        append_log({
+            "ticker": ticker,
+            "status": status,
+            "rows": n,
+            "start": start,
+            "end": end,
+        })
+
+        return ticker, status, n
+
+    except Exception as e:
+        logger.exception(f"FAIL {ticker} {e}")
+        return ticker, "error", 0
+
+
 def main():
     ensure_dirs()
 
@@ -228,25 +280,15 @@ def main():
 
     df = load_stocklist()
 
-    for i, row in df.iterrows():
-        logger.info(f"[{i+1}/{len(df)}] {row['ticker']}")
+    futures = []
 
-        start = pd.Timestamp.utcnow()
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for _, row in df.iterrows():
+            futures.append(executor.submit(process_row, row))
 
-        try:
-            ok, status, n = download_one(row)
-            end = pd.Timestamp.utcnow()
-
-            append_log({
-                "ticker": row["ticker"],
-                "status": status,
-                "rows": n,
-                "start": start,
-                "end": end,
-            })
-
-        except Exception as e:
-            logger.exception(f"FAIL {row['ticker']} {e}")
+        for i, future in enumerate(as_completed(futures), 1):
+            ticker, status, n = future.result()
+            logger.info(f"[{i}/{len(futures)}] DONE {ticker} | {status} | rows={n}")
 
     logger.info("END")
 
