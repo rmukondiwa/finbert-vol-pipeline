@@ -44,7 +44,7 @@ END_DATE = pd.Timestamp.today().strftime("%Y-%m-%d")
 HL = "en-US"
 TZ = 360
 GEO = "US"
-CHUNK_DAYS = 365  # yearly chunks (weekly resolution anyway)  # bigger chunks = fewer requests (weekly data anyway)
+CHUNK_DAYS = 90  # bigger chunks = fewer requests (weekly data anyway)
 
 SKIP_EXISTING = True
 REQUEST_SLEEP_RANGE = (1, 3)  # aggressive but usually safe
@@ -247,7 +247,7 @@ def download_one(row):
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-MAX_WORKERS = 1  # single worker to avoid rate limiting  # reduced to lower 429 risk (tune 2–4)  # tune 3–6 depending on throttling
+MAX_WORKERS = 3  # reduced to lower 429 risk (tune 2–4)  # tune 3–6 depending on throttling
 
 
 def process_row(row):
