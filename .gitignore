@@ -2,3 +2,4 @@
 *.log
 *.pem
 *.parquet
+__pycache__
