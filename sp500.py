@@ -26,6 +26,6 @@ df["ticker"] = df["ticker"].str.replace(".", "-", regex=False)
 os.makedirs("data", exist_ok=True)
 
 # save
-df.to_csv("data/sp500.csv", index=False)
+df.to_csv("data/reference/sp500.csv", index=False)
 
 print("Saved cleaned sp500.csv")
