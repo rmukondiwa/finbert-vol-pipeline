@@ -1,0 +1,4 @@
+modal==1.4.1
+pandas==2.2.3
+pytrends==4.9.2
+requests==2.32.5
