@@ -26,10 +26,10 @@ from pytrends.request import TrendReq
 # -----------------------------
 
 OUTPUT_DIR = Path("data")
-RAW_DIR = OUTPUT_DIR / "raw"
+RAW_DIR = OUTPUT_DIR / "google_trends"
 LOG_DIR = OUTPUT_DIR / "logs"
 
-STOCKLIST_FILE = OUTPUT_DIR / "stocklist.csv"
+STOCKLIST_FILE = OUTPUT_DIR / "reference" / "stocklist.csv"
 DOWNLOAD_LOG_FILE = LOG_DIR / "download_log.csv"
 RUN_LOG_FILE = LOG_DIR / "run.log"
 

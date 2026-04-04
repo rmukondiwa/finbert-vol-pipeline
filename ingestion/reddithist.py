@@ -24,14 +24,14 @@ else:
     START_DATE = datetime(2018, 1, 1)
     END_DATE = datetime.now(timezone.utc).replace(tzinfo=None)
 
-OUTPUT_FILE = sys.argv[3] if len(sys.argv) >= 4 else "reddit_firehose.csv"
+OUTPUT_FILE = sys.argv[3] if len(sys.argv) >= 4 else "data/reddit/reddit_firehose.csv"
 
 print(f"RUNNING FROM {START_DATE} TO {END_DATE} → {OUTPUT_FILE}")
 
 # =========================
 # LOAD S&P 500 DATA (DO NOT MODIFY FILE)
 # =========================
-sp500_df = pd.read_csv("data/sp500.csv")
+sp500_df = pd.read_csv("data/reference/sp500.csv")
 
 # Build mappings
 ticker_to_name = dict(zip(sp500_df["ticker"], sp500_df["name"]))

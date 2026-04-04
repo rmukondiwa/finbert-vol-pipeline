@@ -2,4 +2,5 @@
 *.log
 *.pem
 *.parquet
+__pycache__
 *.env
