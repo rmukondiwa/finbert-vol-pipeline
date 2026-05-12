@@ -1,5 +1,6 @@
 import sys
 import importlib
+from unittest.mock import patch
 import pytest
 import pandas as pd
 from datetime import date
@@ -47,20 +48,28 @@ class TestSanitizeTicker:
 
 
 # ── reddithist ticker extraction ──────────────────────────────────────────────
-# reddithist.py has module-level sys.argv parsing and CSV loading.
-# We patch sys.argv before import so it takes the safe else-branch defaults.
-# Tests must be run from the project root so data/reference/sp500.csv resolves.
+# reddithist.py loads sp500.csv and parses sys.argv at module level.
+# We mock pd.read_csv with a minimal in-memory DataFrame so no file is needed,
+# and patch sys.argv to avoid the CLI date-parsing branch.
+
+_MOCK_SP500 = pd.DataFrame({
+    "ticker": ["AAPL", "MSFT", "TSLA", "NVDA", "GOOG", "IT"],
+    "name":   ["Apple Inc.", "Microsoft Corporation", "Tesla Inc.",
+               "NVIDIA Corporation", "Alphabet Inc.", "Gartner Inc."],
+})
+
 
 @pytest.fixture(scope="module")
 def rh():
-    original = sys.argv[:]
+    original_argv = sys.argv[:]
     sys.argv = ["reddithist.py"]
+    sys.modules.pop("reddithist", None)  # force fresh import so mock takes effect
     try:
-        if "reddithist" in sys.modules:
-            return sys.modules["reddithist"]
-        return importlib.import_module("reddithist")
+        with patch("pandas.read_csv", return_value=_MOCK_SP500):
+            mod = importlib.import_module("reddithist")
+        return mod
     finally:
-        sys.argv = original
+        sys.argv = original_argv
 
 
 class TestExtractTickers:
