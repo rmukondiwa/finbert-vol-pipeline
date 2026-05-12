@@ -1,5 +1,7 @@
 # Volatility Sentiment Strategy
 
+[![CI](https://github.com/rmukondiwa/finbert-vol-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/rmukondiwa/finbert-vol-pipeline/actions/workflows/ci.yml)
+
 A data pipeline that collects retail investor sentiment from Reddit and Google Trends, scores it with FinBERT, and produces daily trading signals that feed into a QuantConnect strategy.
 
 The core idea: instead of using sentiment as a directional signal ("buy because people are bullish"), we use **sentiment intensity** as a regime indicator — high retail attention triggers a momentum + long straddle strategy, while low attention triggers pairs trading + iron condor.
