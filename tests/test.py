@@ -1,4 +1,1 @@
-import pandas as pd
-
-df = pd.read_csv("data/reddit/test_reddit.csv")
-print(df.head())
+# Tests live in test_aggregator.py and test_ingestion.py
